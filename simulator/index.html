@@ -1,0 +1,817 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Φ Simulator</title>
+<meta name="description" content="Interactive simulation of a controllable threshold model of a self-sustaining absorbed meditative state.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:ital,wght@0,500;1,400&display=swap">
+<style>
+/* Layout: instrument bench. Field screen on the left, control rack on the right, readings under the screen. */
+:root {
+  --bg: #EDF0F4;
+  --surface: #FFFFFF;
+  --fg: #18202E;
+  --muted: #5A6476;
+  --line: #D3D9E2;
+  --accent: #4A3FCF;
+  --signal: #B9690F;
+  --critical: #B93A27;
+  --chip: #E5E8F6;
+  --screen: #0A0E1C;
+  --screen-ink: #E9ECF5;
+  --font-display: 'Spectral', Georgia, 'Times New Roman', serif;
+  --font-body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E121C; --surface: #161B28; --fg: #E5E8EF; --muted: #959EB0; --line: #283043;
+    --accent: #9086FF; --signal: #F0A23B; --critical: #F06A55; --chip: #20263A;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E121C; --surface: #161B28; --fg: #E5E8EF; --muted: #959EB0; --line: #283043;
+  --accent: #9086FF; --signal: #F0A23B; --critical: #F06A55; --chip: #20263A;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  padding-inline: 16px;
+  padding-block: 28px 48px;
+}
+.wrap { max-width: 1160px; margin: 0 auto; display: grid; gap: 28px; }
+
+header { display: grid; gap: 10px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--font-display); font-weight: 500; font-size: clamp(30px, 5vw, 44px); line-height: 1.1; margin: 0; text-wrap: balance; }
+.lede { margin: 0; max-width: 66ch; color: var(--muted); }
+.equation {
+  font-family: var(--font-display); font-style: italic; font-size: clamp(17px, 2.5vw, 23px);
+  padding-block: 12px; border-block: 1px solid var(--line); overflow-x: auto; white-space: nowrap;
+}
+.equation .new { color: var(--accent); font-style: normal; font-weight: 500; }
+.eq-note { margin: 0; font-size: 13px; color: var(--muted); max-width: 74ch; }
+.eq-note b { color: var(--accent); font-weight: 600; }
+
+.lab { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+@media (max-width: 880px) { .lab { grid-template-columns: minmax(0, 1fr); } }
+
+.bench { display: grid; gap: 14px; min-width: 0; }
+.screen {
+  position: relative; width: 100%; max-width: 100%; aspect-ratio: 1 / 1;
+  background: var(--screen); border-radius: 6px; overflow: hidden; touch-action: none; cursor: crosshair;
+}
+.screen canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.status {
+  position: absolute; top: 12px; left: 12px; z-index: 2;
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 12.5px; font-weight: 500;
+  padding: 6px 11px; border-radius: 999px;
+  background: rgba(10, 14, 28, 0.78); color: var(--screen-ink); border: 1px solid rgba(233, 236, 245, 0.18);
+}
+.status i { width: 9px; height: 9px; border-radius: 50%; background: #8A93A8; flex: none; }
+.status[data-s="held"] i { background: #F4B045; box-shadow: 0 0 10px #F4B045; }
+.status[data-s="escaping"] i { background: #A79BFF; box-shadow: 0 0 10px #A79BFF; }
+.status[data-s="runaway"] i { background: #FF6B55; box-shadow: 0 0 10px #FF6B55; }
+.status[data-s="settling"] i { background: transparent; border: 1.5px solid #C6CCDA; }
+.hint {
+  position: absolute; bottom: 12px; left: 12px; right: 12px; z-index: 2;
+  display: flex; justify-content: space-between; align-items: end; gap: 12px; flex-wrap: wrap;
+  font-family: var(--font-mono); font-size: 11.5px; color: rgba(233, 236, 245, 0.75); pointer-events: none;
+}
+.scale { display: grid; gap: 4px; min-width: 150px; }
+.scale .bar { height: 7px; border-radius: 4px; background: linear-gradient(90deg, #0A0E1C, #2B2470 25%, #7A3FB0 50%, #E0703A 72%, #F4B045 88%, #FFF0C9); border: 1px solid rgba(233, 236, 245, 0.25); }
+.scale .ticks { display: flex; justify-content: space-between; }
+
+.readouts {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 0;
+  background: var(--line); border: 1px solid var(--line); border-radius: 6px; overflow: hidden;
+}
+.readouts div { background: var(--surface); padding: 10px 12px; display: grid; gap: 2px; align-content: start; min-width: 0; }
+.readouts dt { font-size: 12.5px; color: var(--muted); }
+.readouts dd { margin: 0; font-family: var(--font-mono); font-size: 17px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.readouts dd small { display: block; font-size: 11.5px; color: var(--muted); }
+@media (max-width: 460px) {
+  .readouts div { padding: 8px 9px; }
+  .readouts dd { font-size: 15px; }
+}
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: grid; gap: 10px; min-width: 0; }
+.panel h3, .rack h3 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.trace-wrap { position: relative; width: 100%; height: 120px; }
+.trace-wrap canvas, .curve-wrap canvas { width: 100%; height: 100%; display: block; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 16px; height: 0; border-top: 2px solid; display: inline-block; }
+.legend .in i { border-color: var(--signal); }
+.legend .out i { border-color: var(--accent); }
+.legend .pt i { border-color: var(--fg); border-top-style: dotted; }
+.legend .dash i { border-top-style: dashed; border-color: var(--muted); }
+
+.rack { display: grid; gap: 18px; min-width: 0; }
+.group { display: grid; gap: 10px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.group:last-child { border-bottom: 0; padding-bottom: 0; }
+.group-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.group-note { margin: 0; font-size: 13px; color: var(--muted); }
+.sub { font-size: 12.5px; color: var(--muted); margin: 0; }
+
+.presets { display: flex; flex-wrap: wrap; gap: 6px; }
+button { font: inherit; color: inherit; }
+.chip {
+  font-size: 13px; padding: 6px 11px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); cursor: pointer; transition: background 0.15s, border-color 0.15s;
+}
+.chip:hover { border-color: var(--accent); }
+.chip[aria-pressed="true"] { background: var(--chip); border-color: var(--accent); color: var(--fg); font-weight: 500; }
+.chip.root { border-style: dashed; }
+.chip.root[aria-pressed="true"] { border-style: solid; }
+#presetNote { min-height: 3.9em; }
+
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: transparent; padding: 6px 12px; font-size: 13px; cursor: pointer; border-right: 1px solid var(--line); }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #FFFFFF; }
+
+.slider { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; }
+.slider label { font-size: 14px; }
+.slider label .sym { font-family: var(--font-display); font-style: italic; font-size: 16px; margin-right: 4px; }
+.slider output { font-family: var(--font-mono); font-size: 13.5px; font-variant-numeric: tabular-nums; color: var(--muted); min-width: 4.5ch; text-align: right; }
+.slider input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 2px 0 0; }
+.slider small { grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); }
+.slider input:disabled { opacity: 0.45; }
+
+.gain { font-family: var(--font-mono); font-size: 13px; padding: 7px 10px; border-radius: 6px; background: var(--chip); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tag { font-family: var(--font-mono); font-size: 12px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+.tag[data-k="carries"] { color: var(--accent); border-color: var(--accent); }
+.tag[data-k="runaway"] { color: var(--critical); border-color: var(--critical); }
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { padding: 8px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: 14px; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #FFFFFF; font-weight: 500; }
+.btn[aria-pressed="true"] { background: var(--chip); border-color: var(--accent); font-weight: 500; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.curve-wrap { width: 100%; height: 170px; }
+#curveNote { margin: 0; font-size: 13px; color: var(--muted); }
+
+.notes { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 28px; border-top: 1px solid var(--line); padding-top: 24px; }
+@media (max-width: 880px) { .notes { grid-template-columns: minmax(0, 1fr); } }
+.notes h2 { font-family: var(--font-display); font-weight: 500; font-size: 22px; margin: 0 0 12px; }
+.notes dl { margin: 0; display: grid; gap: 12px; }
+.notes dl div { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; align-items: baseline; }
+.notes dt { font-family: var(--font-mono); font-size: 12.5px; font-weight: 500; }
+.notes dd { margin: 0; color: var(--muted); }
+.notes p { margin: 0 0 10px; color: var(--muted); max-width: 62ch; }
+.k-held { color: var(--signal); } .k-leak { color: var(--muted); } .k-esc { color: var(--accent); } .k-run { color: var(--critical); }
+.ctl { display: grid; gap: 8px; }
+.ctl .sub { margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Φ · an equation simulation for meditation practice</div>
+    <h1>Φ Simulator</h1>
+    <p class="lede">A controllable threshold model of a self-sustaining absorbed state. Set the drives a practitioner trains, shape the region of the body that is held, light a spark, and watch whether the state catches, holds at its ceiling, survives a release, and switches off on demand.</p>
+    <div class="equation" aria-label="Model equation">∂Φ/∂t = (α·I − β)·Φ + κ·Φ² − γ·Φ³ + D·∇²Φ <span class="new">+ s + η</span></div>
+    <p class="eq-note">Φ is a latent variable: the intensity of the absorbed state at each point of a two-dimensional body map, not a physical field. <b>s</b> is a steady drive (a generated spark such as goodwill or recalled joy) and <b>η</b> is spontaneous fluctuation (a noticed spark). γ is the ceiling, fixed at 1 unless the ceiling is removed; the map's edges let nothing in or out; all units are dimensionless.</p>
+  </header>
+
+  <div class="lab">
+    <section class="bench" aria-label="Body map">
+      <div class="screen" id="screen">
+        <canvas id="field" aria-label="Simulated state Φ on the body map"></canvas>
+        <div class="status" id="status" data-s="settling" role="status"><i></i><span id="statusText">Starting</span></div>
+        <div class="hint">
+          <span>Tap or drag to add a spark by hand · dashed line = the held region</span>
+          <span class="scale"><span class="bar"></span><span class="ticks"><span>Φ 0</span><span>1</span><span>2+</span></span></span>
+        </div>
+      </div>
+
+      <dl class="readouts">
+        <div><dt>Net gain αI − β</dt><dd id="rGain">–</dd></div>
+        <div><dt>Rest level Φ</dt><dd id="rRest">–</dd></div>
+        <div><dt>Threshold Φ</dt><dd id="rThr">–</dd></div>
+        <div><dt>Seed level Φ</dt><dd id="rSeed">–</dd></div>
+        <div><dt>Drive that tips rest</dt><dd><span id="rTip">–</span><small id="rTipNow"></small></dd></div>
+        <div><dt>Exit below gain</dt><dd id="rFold">–</dd></div>
+        <div><dt>Φ inside the region</dt><dd id="rIn">–</dd></div>
+        <div><dt>Φ outside</dt><dd id="rOut">–</dd></div>
+        <div><dt>Time</dt><dd id="rTime">–</dd></div>
+      </dl>
+
+      <div class="panel">
+        <h3>Φ over time</h3>
+        <div class="trace-wrap"><canvas id="trace" aria-label="Mean Φ inside and outside the held region over time"></canvas></div>
+        <div class="legend"><span class="in"><i></i>inside the held region</span><span class="out"><i></i>outside</span></div>
+      </div>
+    </section>
+
+    <section class="rack" aria-label="Controls">
+      <div class="group">
+        <h3>Scenarios</h3>
+        <p class="sub">Entry, size and shape</p>
+        <div class="presets" id="presetsA"></div>
+        <p class="sub">Starting without a deliberate spark</p>
+        <div class="presets" id="presetsB"></div>
+        <p class="group-note" id="presetNote"></p>
+      </div>
+
+      <div class="group">
+        <h3>Control the session</h3>
+        <div class="actions">
+          <button type="button" class="btn primary" id="igniteBtn">Ignite whole region</button>
+          <button type="button" class="btn" id="sparkBtn">Small spark</button>
+          <button type="button" class="btn" id="halfBtn">Half-effort check</button>
+          <button type="button" class="btn" id="offBtn">Off switch</button>
+        </div>
+        <p class="group-note" id="ctlNote">The half-effort check lowers the drive α·I by 10% for 30 time units (effort is only part of the drive); the off switch raises β past the exit point for 30 units. Both then restore the same settings, so you can see the state's history decide what happens next.</p>
+      </div>
+
+      <div class="group">
+        <h3>The trained drives</h3>
+        <div class="slider"><label for="alpha"><span class="sym">α</span>Coupling</label><output id="alphaOut" for="alpha"></output><input type="range" id="alpha" min="0" max="1.5" step="0.01"><small>How strongly attention engages body signals.</small></div>
+        <div class="slider"><label for="rich"><span class="sym">I</span>Richness</label><output id="richOut" for="rich"></output><input type="range" id="rich" min="0" max="1.5" step="0.01"><small>How many regions are bound into one state.</small></div>
+        <div class="slider"><label for="beta"><span class="sym">β</span>Noise</label><output id="betaOut" for="beta"></output><input type="range" id="beta" min="0" max="2.5" step="0.01"><small>Mind-wandering and arousal noise, measured at the session gate.</small></div>
+        <div class="gain" id="gainLine"></div>
+      </div>
+
+      <div class="group">
+        <div class="group-head">
+          <h3>Loop, spread and ceiling</h3>
+          <div class="seg" role="group" aria-label="Ceiling">
+            <button type="button" id="ceilOn" aria-pressed="true">Ceiling γ = 1</button>
+            <button type="button" id="ceilOff" aria-pressed="false">No ceiling</button>
+          </div>
+        </div>
+        <div class="slider"><label for="kappa"><span class="sym">κ</span>Self-feedback</label><output id="kappaOut" for="kappa"></output><input type="range" id="kappa" min="0" max="3" step="0.05"><small>The pleasure–attention loop: attention strengthens the pleasant sensation, and the sensation holds attention.</small></div>
+        <div class="slider"><label for="diff"><span class="sym">D</span>Spread</label><output id="diffOut" for="diff"></output><input type="range" id="diff" min="0.2" max="2" step="0.05"><small>How the state diffuses across the body map.</small></div>
+      </div>
+
+      <div class="group">
+        <h3>Starting without a deliberate spark</h3>
+        <div class="slider"><label for="drive"><span class="sym">s</span>Steady drive</label><output id="driveOut" for="drive"></output><input type="range" id="drive" min="0" max="0.2" step="0.005"><small>A generated spark, such as goodwill or recalled joy, applied inside the held region.</small></div>
+        <div class="slider"><label for="eta"><span class="sym">η</span>Fluctuations</label><output id="etaOut" for="eta"></output><input type="range" id="eta" min="0" max="0.15" step="0.005"><small>Spontaneous sensations: random kicks at every point, every moment.</small></div>
+      </div>
+
+      <div class="group">
+        <div class="group-head">
+          <h3>The held region</h3>
+          <div class="seg" role="group" aria-label="Region shape">
+            <button type="button" data-shape="round" aria-pressed="true">Round</button>
+            <button type="button" data-shape="stretched" aria-pressed="false">Stretched</button>
+            <button type="button" data-shape="scattered" aria-pressed="false">Scattered</button>
+          </div>
+        </div>
+        <div class="slider"><label for="size">Size (radius)</label><output id="sizeOut" for="size"></output><input type="range" id="size" min="4" max="34" step="1"><small>Every shape keeps the same area, so only the shape changes.</small></div>
+        <div class="group-head">
+          <span class="sub">Unattended regions</span>
+          <span class="tag" id="outTag" data-k="blocks">stays inside</span>
+        </div>
+        <div class="slider"><label for="rout">Gain outside the held region</label><output id="routOut" for="rout"></output><input type="range" id="rout" min="-2" max="0.3" step="0.01"><small>How fast unattended parts of the map decay. Close to zero, the state spreads past the region you hold.</small></div>
+      </div>
+
+      <div class="group">
+        <div class="actions">
+          <button type="button" class="btn" id="clearBtn">Clear</button>
+          <button type="button" class="btn" id="pauseBtn">Pause</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Growth curve: the reaction terms</h3>
+        <div class="curve-wrap"><canvas id="curve" aria-label="Growth rate as a function of Φ"></canvas></div>
+        <div class="legend"><span class="out"><i></i>inside the held region</span><span class="dash"><i></i>outside</span></div>
+        <p id="curveNote"></p>
+      </div>
+    </section>
+  </div>
+
+  <section class="notes">
+    <div>
+      <h2>Reading the results</h2>
+      <dl>
+        <div><dt class="k-held">Held</dt><dd>Φ settles at the seed level inside the region and stays low outside: the stored, self-holding state.</dd></div>
+        <div><dt class="k-held">No spark</dt><dd>The state formed without ignition: a steady drive lifted the region past its tipping point, or fluctuations grew where rest was unstable.</dd></div>
+        <div><dt class="k-leak">Drained</dt><dd>Φ went back to rest: the region was too narrow or the wrong shape, the spark too small, or β too high for a seed level to exist.</dd></div>
+        <div><dt class="k-esc">Spreading</dt><dd>The state crossed the region's edge and kept spreading across the map, because unattended regions barely decay.</dd></div>
+        <div><dt class="k-run">Runaway</dt><dd>With the ceiling removed (γ = 0), nothing caps the state, so once above threshold Φ grows without limit.</dd></div>
+      </dl>
+    </div>
+    <div>
+      <h2>Why it is controllable</h2>
+      <p>Inside the window −κ²/4γ &lt; αI − β &lt; 0, rest and the seed state both exist. Entry needs a spark above the threshold, γ caps the state at a plateau, and exit is a deliberate move of the gain below −κ²/4γ. Between those, the same settings can hold either rest or the seed, depending on history: that is what the release test in the protocol measures.</p>
+      <p>This page shows the mathematics of the model and nothing more. It cannot show that a real practitioner's state follows these dynamics. The accompanying protocol tests that, with heart-rate measures, an active control and stop rules fixed in advance.</p>
+    </div>
+  </section>
+</div>
+<script>
+(function () {
+  const N = 160;
+  const C = N / 2;
+  let P = new Float32Array(N * N);
+  let Q = new Float32Array(N * N);
+  const R = new Float32Array(N * N);
+  const SRC = new Float32Array(N * N);
+  const mask = new Uint8Array(N * N);
+  const far = new Uint8Array(N * N);
+  let maskCount = 1, farCount = 1;
+
+  const BASE = { alpha: 0.7, I: 1, beta: 1.5, kappa: 2, D: 1, size: 14, shape: 'round', rout: -1.5,
+                 noCeil: false, s: 0, eta: 0 };
+  const S = Object.assign({}, BASE);
+  let t = 0, running = true, ignited = false, emaF = 0, emaS = 0;
+  let halfUntil = -1, offUntil = -1;
+  const HALF = 0.9, OFF_DB = 1.2, PULSE = 30;
+  const hist = [];
+  const HMAX = 360;
+
+  const $ = (id) => document.getElementById(id);
+  const f2 = (v) => v.toFixed(2);
+  const fx = (v) => (Math.abs(v) < 0.1 ? v.toFixed(3) : v.toFixed(2));
+
+  const PRESETS = [
+    { id: 'hold', g: 'A', label: 'Seed holds', note: 'Round region, noise low enough: the state catches, settles at its ceiling and stays inside the region.', p: {}, act: 'full' },
+    { id: 'narrow', g: 'A', label: 'Too narrow', note: 'Same drives, radius 6. The edge leaks faster than the loop can hold the state.', p: { size: 6 }, act: 'full' },
+    { id: 'scatter', g: 'A', label: 'Same area, scattered', note: 'Five small patches with the same total area as the round region. Each one leaks.', p: { shape: 'scattered' }, act: 'full' },
+    { id: 'noise', g: 'A', label: 'Noise too high', note: 'β at 1.75 puts the gain below the exit point. No seed level exists, so even a fully lit region drains.', p: { beta: 1.75 }, act: 'full' },
+    { id: 'spark3', g: 'A', label: 'Spark too small', note: 'A spark of radius 3 in a good region. It is below the threshold size, so it fades.', p: {}, act: 'spark3' },
+    { id: 'spark6', g: 'A', label: 'Spark big enough', note: 'A spark of radius 6 crosses the threshold, grows to fill the region and stops at its edge.', p: {}, act: 'spark6' },
+    { id: 'spread', g: 'A', label: 'Spreads past the region', note: 'Unattended regions barely decay, so the state leaves the held region and spreads across the whole map.', p: { rout: -0.6 }, act: 'full' },
+    { id: 'noceil', g: 'A', label: 'No ceiling', note: 'The equation without γ, with β at 0.6. Nothing caps the state, so it grows without limit: the reason the ceiling matters for control.', p: { noCeil: true, beta: 0.6 }, act: 'full' },
+    { id: 'tip', g: 'B', label: 'Steady drive: no spark', note: 'A steady drive of 0.12, above the tipping point of about 0.09. Rest disappears and the state forms with no spark at all.', p: { s: 0.12 }, act: 'none' },
+    { id: 'lower', g: 'B', label: 'Drive lowers the threshold', note: 'A steady drive of 0.05, below tipping. Rest rises and the threshold drops, so the radius-3 spark that faded before now catches.', p: { s: 0.05 }, act: 'spark3' },
+    { id: 'noiseseed', g: 'B', label: 'Fluctuations are the spark', note: 'αI is above β, so rest is unstable, yet nothing grows without fluctuations. Set η to 0 and press Clear to see nothing happen.', p: { alpha: 0.9, beta: 0.8, eta: 0.03 }, act: 'none' }
+  ];
+
+  // ---------- noise table ----------
+  const GT = new Float32Array(1 << 16), GM = GT.length - 1;
+  for (let i = 0; i < GT.length; i += 2) {
+    const u1 = Math.random() || 1e-9, u2 = Math.random(), m = Math.sqrt(-2 * Math.log(u1));
+    GT[i] = m * Math.cos(2 * Math.PI * u2); GT[i + 1] = m * Math.sin(2 * Math.PI * u2);
+  }
+
+  const gamma = () => (S.noCeil ? 0 : 1);
+  const effAlphaI = () => S.alpha * S.I * (t < halfUntil ? HALF : 1);
+  const effBeta = () => S.beta + (t < offUntil ? OFF_DB : 0);
+  const gainNow = () => effAlphaI() - effBeta();
+  const gainSet = () => S.alpha * S.I - S.beta;
+  let lastGain = NaN;
+
+  function buildMask() {
+    mask.fill(0); far.fill(0);
+    const r = S.size;
+    const spots = [[0, 0], [-45, -45], [45, -45], [-45, 45], [45, 45]];
+    const rr = r / Math.sqrt(5);
+    const a = r * 2.2, b = r / 2.2;
+    let n = 0, nf = 0;
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const i = y * N + x, dx = x - C, dy = y - C;
+        let inside = false;
+        if (x > 0 && y > 0 && x < N - 1 && y < N - 1) {
+          if (S.shape === 'round') inside = dx * dx + dy * dy < r * r;
+          else if (S.shape === 'stretched') inside = (dx / a) * (dx / a) + (dy / b) * (dy / b) < 1;
+          else for (const [ox, oy] of spots) { if ((dx - ox) ** 2 + (dy - oy) ** 2 < rr * rr) { inside = true; break; } }
+        }
+        if (inside) { mask[i] = 1; n++; }
+        if ((x < 16 || x >= N - 16) && (y < 16 || y >= N - 16) && !inside) { far[i] = 1; nf++; }
+      }
+    }
+    maskCount = Math.max(1, n); farCount = Math.max(1, nf);
+  }
+  function buildR() {
+    const rin = gainNow();
+    lastGain = rin;
+    for (let i = 0; i < N * N; i++) {
+      if (mask[i]) { R[i] = rin; SRC[i] = S.s; }
+      else { R[i] = S.rout; SRC[i] = 0; }
+    }
+  }
+
+  function step(dt) {
+    const k = S.kappa, D = S.D, g = gamma();
+    const lo = -2, hi = g ? 10 : 1e5;
+    const ns = S.eta > 0 ? S.eta * Math.sqrt(dt) : 0;
+    const base = (Math.random() * GT.length) | 0;
+    for (let y = 1; y < N - 1; y++) {
+      const row = y * N;
+      for (let x = 1; x < N - 1; x++) {
+        const i = row + x;
+        const p = P[i];
+        const lap = P[i - 1] + P[i + 1] + P[i - N] + P[i + N] - 4 * p;
+        const f = R[i] * p + k * p * p - g * p * p * p;
+        let v = p + dt * (f + SRC[i] + D * lap);
+        if (ns) v += ns * GT[(base + i * 31) & GM];
+        if (v < lo) v = lo; else if (v > hi) v = hi;
+        Q[i] = v;
+      }
+    }
+    for (let x = 0; x < N; x++) { Q[x] = Q[N + x]; Q[(N - 1) * N + x] = Q[(N - 2) * N + x]; }
+    for (let y = 0; y < N; y++) { Q[y * N] = Q[y * N + 1]; Q[y * N + N - 1] = Q[y * N + N - 2]; }
+    const tmp = P; P = Q; Q = tmp;
+    t += dt;
+  }
+
+  function ignite(kind) {
+    if (kind === 'none') return;
+    if (kind === 'full') { for (let i = 0; i < N * N; i++) if (mask[i]) P[i] = 1.6; }
+    else {
+      const rad = kind === 'spark3' ? 3 : 6;
+      for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) {
+        if ((x - C) ** 2 + (y - C) ** 2 < rad * rad) P[y * N + x] = 1.6;
+      }
+    }
+    ignited = true;
+  }
+  function clearField() { P.fill(0); Q.fill(0); t = 0; ignited = false; hist.length = 0; emaF = 0; emaS = 0; halfUntil = -1; offUntil = -1; buildR(); }
+
+  // ---------- fixed points of the reaction terms ----------
+  function fixedPoints(r, k, s, g) {
+    if (g === 0) {
+      // r*x + k*x^2 + s: no stored level, only a threshold
+      if (k === 0) return r < 0 ? { rest: -s / r, thr: null, seed: null } : { rest: null, thr: null, seed: null };
+      const d = r * r - 4 * k * s;
+      if (d < 0) return { rest: null, thr: null, seed: null };
+      const x1 = (-r - Math.sqrt(d)) / (2 * k), x2 = (-r + Math.sqrt(d)) / (2 * k);
+      const lo = Math.min(x1, x2), hi = Math.max(x1, x2);
+      return { rest: lo >= 0 ? lo : (r < 0 ? 0 : null), thr: hi > 0 ? hi : null, seed: null };
+    }
+    const f = (x) => r * x + k * x * x - g * x * x * x + s;
+    const fp = (x) => r + 2 * k * x - 3 * g * x * x;
+    const roots = [];
+    let x0 = -0.5, y0 = f(x0);
+    for (let j = 1; j <= 900; j++) {
+      const x1 = -0.5 + j * 0.005, y1 = f(x1);
+      if (y0 === 0 || y0 * y1 < 0) {
+        let a = x0, b = x1;
+        for (let it = 0; it < 40; it++) { const m = (a + b) / 2; if (f(a) * f(m) <= 0) b = m; else a = m; }
+        const xr = (a + b) / 2;
+        if (!roots.length || Math.abs(roots[roots.length - 1].x - xr) > 1e-4) roots.push({ x: xr, stable: fp(xr) < 0 });
+      }
+      x0 = x1; y0 = y1;
+    }
+    const phys = roots.filter((q) => q.x >= -1e-6);
+    const st = phys.filter((q) => q.stable), un = phys.filter((q) => !q.stable);
+    if (un.length && st.length >= 2) return { rest: st[0].x, thr: un[0].x, seed: st[st.length - 1].x };
+    if (st.length === 1 && !un.length) {
+      const x = st[0].x;
+      return x > Math.max(k / 3, 0.3) ? { rest: null, thr: null, seed: x, tipped: true } : { rest: x, thr: null, seed: null };
+    }
+    if (st.length === 1 && un.length) {
+      return st[0].x > un[0].x ? { rest: null, thr: un[0].x, seed: st[0].x } : { rest: st[0].x, thr: un[0].x, seed: null };
+    }
+    return { rest: null, thr: null, seed: null };
+  }
+  function tipping(r, k) {
+    if (r >= 0) return { kind: 'unstable' };
+    const disc = 4 * k * k + 12 * r;
+    if (disc <= 0) return { kind: 'none' };
+    const pm = (2 * k - Math.sqrt(disc)) / 6;
+    return { kind: 'value', v: -(r * pm + k * pm * pm - pm * pm * pm) };
+  }
+  const foldGain = () => -(S.kappa * S.kappa) / 4;
+
+  // ---------- colours ----------
+  const stops = [[0, '#0A0E1C'], [0.25, '#2B2470'], [0.5, '#7A3FB0'], [0.72, '#E0703A'], [0.88, '#F4B045'], [1, '#FFF0C9']];
+  const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const LUT = new Uint8ClampedArray(256 * 3);
+  for (let i = 0; i < 256; i++) {
+    const v = i / 255;
+    let j = 0; while (j < stops.length - 2 && v > stops[j + 1][0]) j++;
+    const [v0, c0] = stops[j], [v1, c1] = stops[j + 1];
+    const u = Math.min(1, Math.max(0, (v - v0) / (v1 - v0)));
+    const a = hex(c0), b = hex(c1);
+    for (let c = 0; c < 3; c++) LUT[i * 3 + c] = a[c] + (b[c] - a[c]) * u;
+  }
+  let tok = {};
+  function readTokens() {
+    const cs = getComputedStyle(document.documentElement);
+    ['--fg', '--muted', '--line', '--accent', '--signal', '--critical', '--surface'].forEach((k) => { tok[k] = cs.getPropertyValue(k).trim(); });
+  }
+  readTokens();
+  try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readTokens(); drawCurve(); }); } catch (e) {}
+  new MutationObserver(() => { readTokens(); drawCurve(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  // ---------- canvases ----------
+  const field = $('field'), fctx = field.getContext('2d');
+  const off = document.createElement('canvas'); off.width = N; off.height = N;
+  const octx = off.getContext('2d'); const img = octx.createImageData(N, N);
+  const trace = $('trace'), tctx = trace.getContext('2d');
+  const curve = $('curve'), cctx = curve.getContext('2d');
+  function fit(cv) {
+    const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+    const w = Math.max(1, Math.round(r.width * d)), h = Math.max(1, Math.round(r.height * d));
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  }
+  try {
+    const ro = new ResizeObserver(() => { fit(field); fit(trace); fit(curve); drawCurve(); });
+    [field, trace, curve].forEach((c) => ro.observe(c));
+  } catch (e) {}
+  const DISP = 2;
+
+  function drawField() {
+    const d = img.data;
+    for (let i = 0; i < N * N; i++) {
+      let v = P[i] / DISP; if (v < 0) v = 0; else if (v > 1) v = 1;
+      const li = (v * 255) | 0;
+      d[i * 4] = LUT[li * 3]; d[i * 4 + 1] = LUT[li * 3 + 1]; d[i * 4 + 2] = LUT[li * 3 + 2]; d[i * 4 + 3] = 255;
+    }
+    octx.putImageData(img, 0, 0);
+    const W = field.width, H = field.height, s = W / N, dpr = window.devicePixelRatio || 1;
+    fctx.imageSmoothingEnabled = true;
+    fctx.drawImage(off, 0, 0, W, H);
+    fctx.save();
+    fctx.strokeStyle = 'rgba(233,236,245,0.6)';
+    fctx.lineWidth = Math.max(1, 1.2 * dpr);
+    fctx.setLineDash([6 * dpr, 5 * dpr]);
+    const r = S.size;
+    fctx.beginPath();
+    if (S.shape === 'round') fctx.arc(C * s, C * s, r * s, 0, Math.PI * 2);
+    else if (S.shape === 'stretched') fctx.ellipse(C * s, C * s, r * 2.2 * s, (r / 2.2) * s, 0, 0, Math.PI * 2);
+    else {
+      const rr = r / Math.sqrt(5);
+      for (const [ox, oy] of [[0, 0], [-45, -45], [45, -45], [-45, 45], [45, 45]]) {
+        fctx.moveTo((C + ox + rr) * s, (C + oy) * s);
+        fctx.arc((C + ox) * s, (C + oy) * s, rr * s, 0, Math.PI * 2);
+      }
+    }
+    fctx.stroke();
+    fctx.restore();
+  }
+
+  function drawTrace() {
+    const W = trace.width, H = trace.height, d = window.devicePixelRatio || 1;
+    tctx.clearRect(0, 0, W, H);
+    const pad = 4 * d, ymax = DISP;
+    tctx.strokeStyle = tok['--line']; tctx.lineWidth = 1; tctx.setLineDash([]);
+    for (let g = 0; g <= 2; g++) {
+      const y = H - pad - (g / 2) * (H - 2 * pad);
+      tctx.beginPath(); tctx.moveTo(0, y); tctx.lineTo(W, y); tctx.stroke();
+    }
+    tctx.fillStyle = tok['--muted']; tctx.font = `${10.5 * d}px 'IBM Plex Mono', monospace`;
+    tctx.fillText(String(ymax), 2 * d, pad + 10 * d); tctx.fillText(String(ymax / 2), 2 * d, H / 2 - 2 * d);
+    const line = (key, color) => {
+      if (hist.length < 2) return;
+      tctx.strokeStyle = color; tctx.lineWidth = 2 * d; tctx.setLineDash([]); tctx.beginPath();
+      hist.forEach((h, j) => {
+        const x = (j / (HMAX - 1)) * W;
+        const v = Math.min(ymax, Math.max(0, h[key]));
+        const y = H - pad - (v / ymax) * (H - 2 * pad);
+        j ? tctx.lineTo(x, y) : tctx.moveTo(x, y);
+      });
+      tctx.stroke();
+      const last = hist[hist.length - 1];
+      const lx = ((hist.length - 1) / (HMAX - 1)) * W, ly = H - pad - (Math.min(ymax, Math.max(0, last[key])) / ymax) * (H - 2 * pad);
+      tctx.fillStyle = color; tctx.beginPath(); tctx.arc(lx, ly, 3.2 * d, 0, Math.PI * 2); tctx.fill();
+    };
+    // shade pulses
+    tctx.fillStyle = tok['--line'];
+    hist.forEach((h, j) => { if (h.pulse) { const x = (j / (HMAX - 1)) * W; tctx.globalAlpha = 0.5; tctx.fillRect(x, 0, Math.max(1, W / HMAX + 0.5), H); tctx.globalAlpha = 1; } });
+    line('out', tok['--accent']);
+    line('in', tok['--signal']);
+  }
+
+  function drawCurve() {
+    if (!cctx) return;
+    const W = curve.width, H = curve.height, d = window.devicePixelRatio || 1;
+    cctx.clearRect(0, 0, W, H);
+    const rin = gainNow(), k = S.kappa, g = gamma();
+    const sin = S.s;
+    const f = (r, s, x) => r * x + k * x * x - g * x * x * x + s;
+    const xmax = 2.4, padL = 28 * d, padR = 10 * d, padT = 10 * d, padB = 20 * d;
+    let ymax = 0.4;
+    for (let i = 0; i <= 120; i++) { const x = (i / 120) * xmax; ymax = Math.max(ymax, Math.abs(f(rin, sin, x)), Math.abs(f(S.rout, 0, x)) * 0.6); }
+    ymax = Math.min(ymax * 1.1, 4);
+    const X = (x) => padL + (x / xmax) * (W - padL - padR);
+    const Y = (y) => padT + (1 - (y + ymax) / (2 * ymax)) * (H - padT - padB);
+    cctx.font = `${10.5 * d}px 'IBM Plex Mono', monospace`;
+    cctx.strokeStyle = tok['--line']; cctx.lineWidth = 1; cctx.setLineDash([]);
+    cctx.beginPath(); cctx.moveTo(padL, Y(0)); cctx.lineTo(W - padR, Y(0)); cctx.stroke();
+    cctx.fillStyle = tok['--muted'];
+    [0, 1, 2].forEach((v) => { cctx.fillText(String(v), X(v) - 3 * d, H - 5 * d); cctx.beginPath(); cctx.moveTo(X(v), Y(0) - 3 * d); cctx.lineTo(X(v), Y(0) + 3 * d); cctx.stroke(); });
+    cctx.fillText('Φ', W - padR - 8 * d, H - 5 * d);
+    cctx.fillText('grows', 2 * d, padT + 8 * d);
+    cctx.fillText('drains', 2 * d, H - padB - 2 * d);
+    const plot = (r, s, color, dash, w) => {
+      cctx.save(); cctx.beginPath(); cctx.rect(padL, padT, W - padL - padR, H - padT - padB); cctx.clip();
+      cctx.strokeStyle = color; cctx.lineWidth = w * d; cctx.setLineDash(dash.map((v) => v * d));
+      cctx.beginPath();
+      for (let i = 0; i <= 200; i++) { const x = (i / 200) * xmax, y = f(r, s, x); i ? cctx.lineTo(X(x), Y(y)) : cctx.moveTo(X(x), Y(y)); }
+      cctx.stroke(); cctx.restore();
+    };
+    plot(S.rout, 0, tok['--muted'], [5, 4], 1.5);
+    plot(rin, sin, tok['--accent'], [], 2.2);
+    const fp = fixedPoints(rin, k, sin, g);
+    const dot = (x, label, fill) => {
+      if (x == null || x < 0 || x > xmax) return;
+      cctx.setLineDash([]); cctx.lineWidth = 1.6 * d;
+      cctx.beginPath(); cctx.arc(X(x), Y(0), 4.5 * d, 0, Math.PI * 2);
+      if (fill) { cctx.fillStyle = fill; cctx.fill(); } else { cctx.fillStyle = tok['--surface']; cctx.fill(); cctx.strokeStyle = tok['--fg']; cctx.stroke(); }
+      cctx.fillStyle = tok['--fg'];
+      const tx = Math.max(padL, Math.min(X(x) - cctx.measureText(label).width / 2, W - padR - cctx.measureText(label).width));
+      cctx.fillText(label, tx, Y(0) - 9 * d);
+    };
+    dot(fp.rest, 'rest', tok['--fg']);
+    dot(fp.thr, 'threshold', null);
+    dot(fp.seed, 'seed', tok['--signal']);
+  }
+
+  // ---------- status + readouts ----------
+  function measure() {
+    let si = 0, sf = 0, mx = 0, high = 0;
+    for (let i = 0; i < N * N; i++) {
+      const p = P[i];
+      if (p > mx) mx = p;
+      if (mask[i]) si += p;
+      else if (p > 0.8) high++;
+      if (far[i]) sf += p;
+    }
+    return { inn: si / maskCount, out: sf / farCount, mx, highFrac: high / (N * N - maskCount) };
+  }
+  function setStatus(s, text) { const el = $('status'); if (el.dataset.s !== s) el.dataset.s = s; $('statusText').textContent = text; }
+
+  function updateReadouts(m) {
+    const rin = gainNow(), g = gamma();
+    const fp = fixedPoints(rin, S.kappa, S.s, g);
+    $('rGain').textContent = (rin >= 0 ? '+' : '') + f2(rin) + (t < halfUntil ? ' (half effort)' : t < offUntil ? ' (off switch)' : '');
+    $('rRest').textContent = fp.rest != null ? fx(Math.max(0, fp.rest)) : 'unstable';
+    $('rThr').textContent = fp.thr != null ? (fp.thr < 0.005 ? '0 (any spark)' : f2(fp.thr)) : (fp.tipped ? 'gone' : 'none');
+    $('rSeed').textContent = g === 0 ? 'no ceiling' : fp.seed != null ? f2(fp.seed) : 'none';
+    if (g === 0) { $('rTip').textContent = 'n/a'; $('rTipNow').textContent = 'no stored level without γ'; }
+    else {
+      const tp = tipping(rin, S.kappa);
+      $('rTip').textContent = tp.kind === 'value' ? fx(tp.v) : tp.kind === 'unstable' ? '0' : 'none';
+      $('rTipNow').textContent = tp.kind === 'unstable' ? 'rest already unstable' : `drive now ${fx(S.s)}`;
+    }
+    $('rFold').textContent = g === 0 ? 'none' : f2(foldGain());
+    const big = (v) => (v > 999 ? v.toExponential(1) : fx(v));
+    $('rIn').textContent = big(Math.max(0, m.inn));
+    $('rOut').textContent = big(Math.max(0, m.out));
+    $('rTime').textContent = 't = ' + Math.round(t);
+  }
+
+  function classify(m) {
+    emaF += 0.3 * (m.inn - emaF); emaS += 0.05 * (m.inn - emaS);
+    const dIn = emaF - emaS;
+    const tol = 0.002 + 0.7 * S.eta;
+    const g = gamma();
+    if (g === 0 && m.mx > 20) return setStatus('runaway', 'Runaway: grows without limit');
+    if (m.highFrac > 0.03) return setStatus('escaping', 'Spreading past the region');
+    if (t < offUntil) return setStatus('settling', 'Off switch: draining');
+    const fp = fixedPoints(gainNow(), S.kappa, S.s, g);
+    const steady = Math.abs(dIn) < tol;
+    if (g && fp.seed != null && m.inn > 0.5 * fp.seed && (steady || t < halfUntil))
+      return setStatus('held', t < halfUntil ? 'Half effort: still held' : ignited ? 'Held: seed stored' : 'Held: formed with no spark');
+    if (m.inn < 0.25 && steady) return setStatus('rest', ignited ? 'Drained: back at rest' : 'At rest');
+    return setStatus('settling', 'Settling');
+  }
+
+  function updateControls() {
+    $('alphaOut').textContent = f2(S.alpha);
+    $('richOut').textContent = f2(S.I);
+    $('betaOut').textContent = f2(S.beta);
+    $('kappaOut').textContent = f2(S.kappa);
+    $('diffOut').textContent = f2(S.D);
+    $('sizeOut').textContent = S.size;
+    $('routOut').textContent = f2(S.rout);
+    $('driveOut').textContent = S.s.toFixed(3);
+    $('etaOut').textContent = S.eta.toFixed(3);
+    const rin = gainSet(), g = gamma();
+    let line = `α·I − β = ${f2(S.alpha * S.I)} − ${f2(S.beta)} = ${rin >= 0 ? '+' : ''}${f2(rin)}`;
+    if (g) {
+      const fg = foldGain();
+      line += rin < fg ? ' · below the exit point: no seed can exist' : rin < 0 ? ' · in the controllable window' : ' · rest unstable';
+    }
+    $('gainLine').textContent = line;
+    const tag = $('outTag');
+    const spreads = g ? S.rout > -2 * S.kappa * S.kappa / 9 : S.rout > 0;
+    tag.dataset.k = spreads ? 'carries' : 'blocks';
+    tag.textContent = spreads ? 'spreads past the region' : 'stays inside';
+    $('ceilOn').setAttribute('aria-pressed', String(!S.noCeil));
+    $('ceilOff').setAttribute('aria-pressed', String(S.noCeil));
+    document.querySelectorAll('[data-shape]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.shape === S.shape)));
+    const fp = fixedPoints(gainNow(), S.kappa, S.s, g);
+    const r = gainNow();
+    let note;
+    if (!g) {
+      note = fp.thr != null
+        ? `Without the ceiling there is a threshold (Φ ≈ ${f2(fp.thr)}) but no stored level: above it, Φ grows without limit.`
+        : 'Without the ceiling there is no stored level: any growth runs away.';
+    } else if (fp.tipped || (fp.rest == null && fp.seed != null)) {
+      note = r >= 0 && S.s === 0
+        ? 'Rest is unstable, so any fluctuation grows to the seed level. Without fluctuations, nothing starts.'
+        : `The drive has lifted the curve above zero at low Φ: rest is gone, so the region tips into the seed (Φ ≈ ${f2(fp.seed)}) with no spark.`;
+    } else if (fp.seed == null) {
+      note = 'The curve never climbs back above zero: noise outweighs the loop, so no seed level exists. This is the off switch.';
+    } else {
+      note = `Below the threshold (Φ ≈ ${f2(fp.thr)}) Φ drains back to rest (≈ ${fx(fp.rest)}); above it, it climbs to the seed level (≈ ${f2(fp.seed)}) and stops there.`;
+      if (S.s > 0) note += ' The drive lifts rest and lowers the threshold.';
+    }
+    $('curveNote').textContent = note;
+  }
+
+  function setValues() {
+    $('alpha').value = S.alpha; $('rich').value = S.I; $('beta').value = S.beta;
+    $('kappa').value = S.kappa; $('diff').value = S.D; $('size').value = S.size; $('rout').value = S.rout;
+    $('drive').value = S.s; $('eta').value = S.eta;
+  }
+
+  // ---------- presets ----------
+  function markPreset(id) {
+    document.querySelectorAll('.presets .chip').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.id === id)));
+    const p = PRESETS.find((x) => x.id === id);
+    $('presetNote').textContent = p ? p.note : 'Custom settings. Pick a scenario to reset.';
+  }
+  function applyPreset(p) {
+    Object.assign(S, BASE, p.p);
+    setValues(); buildMask(); clearField(); ignite(p.act);
+    markPreset(p.id); updateControls(); drawCurve();
+    if (!running) togglePause();
+  }
+  PRESETS.forEach((p) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip' + (p.g === 'B' ? ' root' : ''); b.textContent = p.label; b.dataset.id = p.id; b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', () => applyPreset(p));
+    $(p.g === 'A' ? 'presetsA' : 'presetsB').appendChild(b);
+  });
+
+  // ---------- controls ----------
+  const bind = (id, key, rebuildMask) => $(id).addEventListener('input', (e) => {
+    S[key] = parseFloat(e.target.value);
+    if (rebuildMask) buildMask();
+    buildR(); updateControls(); drawCurve(); markPreset(null);
+  });
+  bind('alpha', 'alpha'); bind('rich', 'I'); bind('beta', 'beta');
+  bind('kappa', 'kappa'); bind('diff', 'D'); bind('size', 'size', true); bind('rout', 'rout');
+  bind('drive', 's'); bind('eta', 'eta');
+  document.querySelectorAll('[data-shape]').forEach((b) => b.addEventListener('click', () => {
+    S.shape = b.dataset.shape; buildMask(); buildR(); updateControls(); markPreset(null);
+  }));
+  $('ceilOn').addEventListener('click', () => { S.noCeil = false; P.forEach((v, i) => { if (v > 10) P[i] = 10; }); updateControls(); drawCurve(); markPreset(null); });
+  $('ceilOff').addEventListener('click', () => { S.noCeil = true; updateControls(); drawCurve(); markPreset(null); });
+  $('igniteBtn').addEventListener('click', () => ignite('full'));
+  $('sparkBtn').addEventListener('click', () => ignite('spark6'));
+  $('halfBtn').addEventListener('click', () => { halfUntil = t + PULSE; offUntil = -1; buildR(); updateControls(); drawCurve(); });
+  $('offBtn').addEventListener('click', () => { offUntil = t + PULSE; halfUntil = -1; buildR(); updateControls(); drawCurve(); });
+  $('clearBtn').addEventListener('click', () => { clearField(); updateControls(); drawCurve(); });
+  function togglePause() { running = !running; $('pauseBtn').textContent = running ? 'Pause' : 'Run'; }
+  $('pauseBtn').addEventListener('click', togglePause);
+
+  // add a spark by hand
+  const screen = $('screen');
+  let painting = false;
+  function paint(e) {
+    const r = screen.getBoundingClientRect();
+    const gx = ((e.clientX - r.left) / r.width) * N, gy = ((e.clientY - r.top) / r.height) * N;
+    const rad = 4;
+    for (let y = Math.max(1, Math.floor(gy - rad)); y <= Math.min(N - 2, Math.ceil(gy + rad)); y++)
+      for (let x = Math.max(1, Math.floor(gx - rad)); x <= Math.min(N - 2, Math.ceil(gx + rad)); x++)
+        if ((x - gx) ** 2 + (y - gy) ** 2 < rad * rad) P[y * N + x] = Math.max(P[y * N + x], 1.6);
+    ignited = true;
+  }
+  screen.addEventListener('pointerdown', (e) => { painting = true; try { screen.setPointerCapture(e.pointerId); } catch (_) {} paint(e); });
+  screen.addEventListener('pointermove', (e) => { if (painting) paint(e); });
+  ['pointerup', 'pointercancel'].forEach((ev) => screen.addEventListener(ev, () => { painting = false; }));
+
+  // ---------- loop ----------
+  let frame = 0;
+  function loop() {
+    if (running) {
+      const dt = Math.min(0.2, 0.2 / S.D);
+      const steps = Math.round(3.2 / dt);
+      for (let s = 0; s < steps; s++) {
+        step(dt);
+        const g = gainNow();
+        if (g !== lastGain) { buildR(); updateControls(); drawCurve(); }
+      }
+    }
+    const m = measure();
+    if (running && frame % 2 === 0) { hist.push({ in: m.inn, out: m.out, pulse: t < halfUntil || t < offUntil }); if (hist.length > HMAX) hist.shift(); }
+    drawField(); drawTrace(); updateReadouts(m);
+    if (running) classify(m); else setStatus($('status').dataset.s, 'Paused');
+    frame++;
+    requestAnimationFrame(loop);
+  }
+
+  window.__phi = { S, step, measure, applyPreset, PRESETS, gainNow, fixedPoints, get t() { return t; }, P: () => P, mask,
+                   half: () => $('halfBtn').click(), off: () => $('offBtn').click() };
+
+  fit(field); fit(trace); fit(curve);
+  applyPreset(PRESETS[0]);
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
