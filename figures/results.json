@@ -1,0 +1,50 @@
+{
+  "fold_gain": -1.0,
+  "default_fixed_points": {
+    "rest": 0.0,
+    "threshold": 0.5527864045000421,
+    "seed": 1.4472135954999579
+  },
+  "minimum_radius": 7,
+  "shapes_equal_area": {
+    "round": {
+      "cells": 609,
+      "mean_phi": 1.256,
+      "held": true
+    },
+    "stretched": {
+      "cells": 625,
+      "mean_phi": 1.024,
+      "held": true
+    },
+    "scattered": {
+      "cells": 605,
+      "mean_phi": 0.0,
+      "held": false
+    }
+  },
+  "minimum_spark_radius": 5,
+  "session": {
+    "plateau_phi": 1.549,
+    "phi_end_of_release": 1.302,
+    "phi_after_off_switch": 0.004,
+    "release_retention": 0.84
+  },
+  "early_warning": {
+    "gain_driven": {
+      "runs": 29,
+      "median_onset_gain": -0.062,
+      "median_tau_variance": 0.334,
+      "median_tau_ac1": 0.357,
+      "share_tau_variance_positive": 0.793,
+      "share_tau_ac1_positive": 0.724
+    },
+    "spark_driven": {
+      "runs": 30,
+      "median_tau_variance": 0.066,
+      "median_tau_ac1": 0.095,
+      "share_tau_variance_positive": 0.6,
+      "share_tau_ac1_positive": 0.667
+    }
+  }
+}
