@@ -19,6 +19,8 @@
 | s | steady drive: a generated spark (goodwill, recalled joy) |
 | η | fluctuations: a noticed spark |
 
+**Try it:** [open the simulator](https://zodax2.github.io/phi-meditation-model/simulator/) · [read the paper (PDF)](paper/phi-controllable-absorption.pdf) · [the practice, step by step](protocol/protocol.md)
+
 ## Why "controllable"
 
 With r = αI − β, the model has a window −κ²/4γ < r < 0 in which rest and the absorbed state coexist. Inside it:
@@ -36,7 +38,7 @@ Because of this hysteresis, the same settings can hold either rest or the absorb
 | Path | What it is |
 | --- | --- |
 | [`paper/phi-controllable-absorption.pdf`](paper/phi-controllable-absorption.pdf) | The paper: model, analysis, predictions, protocol summary, limitations, safety |
-| [`simulator/index.html`](simulator/index.html) | Interactive simulator: open it in any browser, no install |
+| [`simulator/index.html`](simulator/index.html) | Interactive simulator, [live here](https://zodax2.github.io/phi-meditation-model/simulator/); no install |
 | [`protocol/protocol.md`](protocol/protocol.md) | The full practice, step by step: drills, session, comparison method, control, programme, fixes, safety, log |
 | [`model/phi_model.py`](model/phi_model.py) | Reference implementation (NumPy) |
 | [`model/make_figures.py`](model/make_figures.py) | Regenerates every figure and number in the paper |
