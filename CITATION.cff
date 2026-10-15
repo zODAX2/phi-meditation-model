@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this model, simulator or protocol, please cite it as below."
+title: "Φ: An Equation Simulation for Meditation Practice. A controllable way to push beyond human limits"
+version: "1.0"
+date-released: "2026-10-15"
+license: MIT
+authors:
+  - family-names: Amarire
+    given-names: Zouhair
+    affiliation: "Independent researcher, Rabat, Morocco"
+keywords:
+  - meditation
+  - absorption
+  - jhana
+  - interoception
+  - heart-rate variability
+  - bistability
+  - reaction-diffusion
+  - early-warning signals
